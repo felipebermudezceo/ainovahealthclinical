@@ -7,7 +7,7 @@ import { DoctorSummary } from "@/components/doctor-summary";
 import { SelectInput, TextArea, TextInput } from "@/components/form-controls";
 import { getCurrentDoctor } from "@/lib/doctor";
 import { calculateBmi } from "@/lib/format";
-import { saveHistory } from "@/lib/histories";
+import { saveHistory, updateHistory } from "@/lib/histories";
 import { emptyHistoryForm, type HistoryErrors, type HistoryField, type HistoryFormValues } from "@/lib/types";
 import { REQUIRED_FIELD_ORDER, validateHistory } from "@/lib/validate-history";
 
@@ -45,9 +45,16 @@ function Section({
   );
 }
 
-export function HistoryForm() {
+export function HistoryForm({
+  historyId,
+  initialValues,
+}: {
+  historyId?: string;
+  initialValues?: HistoryFormValues;
+}) {
   const router = useRouter();
-  const [values, setValues] = useState<HistoryFormValues>(emptyHistoryForm);
+  const editing = Boolean(historyId);
+  const [values, setValues] = useState<HistoryFormValues>(initialValues ?? emptyHistoryForm);
   const [errors, setErrors] = useState<HistoryErrors>({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -77,6 +84,12 @@ export function HistoryForm() {
 
     setSaving(true);
     try {
+      if (historyId) {
+        await updateHistory(historyId, { ...values, bmi });
+        router.push("/historias?actualizada=1");
+        return;
+      }
+
       const history = await saveHistory({ ...values, bmi });
       let pdfReady = false;
 
@@ -94,7 +107,11 @@ export function HistoryForm() {
     } catch (error) {
       setSaving(false);
       setFormError(
-        error instanceof Error ? error.message : "No fue posible guardar la historia clínica.",
+        error instanceof Error
+          ? error.message
+          : editing
+            ? "No fue posible actualizar la historia clínica."
+            : "No fue posible guardar la historia clínica.",
       );
     }
   }
@@ -104,9 +121,13 @@ export function HistoryForm() {
   return (
     <div>
       <header className="mb-8">
-        <h1 className="text-3xl font-semibold tracking-tight text-ink">Nueva historia clínica</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-ink">
+          {editing ? "Editar historia clínica" : "Nueva historia clínica"}
+        </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-          Registre la atención médica y complete la información clínica del paciente.
+          {editing
+            ? "Actualice la información clínica de esta historia."
+            : "Registre la atención médica y complete la información clínica del paciente."}
         </p>
       </header>
 
@@ -205,7 +226,7 @@ export function HistoryForm() {
         <div className="flex flex-col gap-4 rounded-2xl border border-line bg-surface px-5 py-5 shadow-[0_1px_2px_rgba(18,38,58,0.04)] sm:flex-row sm:items-center sm:justify-between sm:px-7">
           <p className="text-sm text-muted">Los campos con * son obligatorios. El correo del paciente es necesario solo para el envío.</p>
           <button type="submit" disabled={saving} className={`${primaryButtonClass} w-full sm:w-auto`}>
-            {saving ? "Guardando…" : "Guardar historia clínica"}
+            {saving ? "Guardando…" : editing ? "Guardar cambios" : "Guardar historia clínica"}
           </button>
         </div>
       </form>

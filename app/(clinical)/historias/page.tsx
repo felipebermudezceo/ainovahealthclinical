@@ -5,6 +5,11 @@ export const metadata: Metadata = {
   title: "Historias clínicas",
 };
 
-export default function HistoriasPage() {
-  return <HistoryList />;
+export default async function HistoriasPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ actualizada?: string }>;
+}) {
+  const params = await searchParams;
+  return <HistoryList updated={params.actualizada === "1"} />;
 }

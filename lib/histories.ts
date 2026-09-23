@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isIsoDate } from "@/lib/format";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { ClinicalHistory, HistoryFormValues } from "@/lib/types";
 
@@ -146,6 +147,134 @@ function saveError(error: { code?: string; message?: string }): Error {
   return new Error("No fue posible guardar la historia clínica.");
 }
 
+function inputDate(value: string): string {
+  const trimmed = value.trim();
+  return isIsoDate(trimmed.slice(0, 10)) ? trimmed.slice(0, 10) : trimmed;
+}
+
+function inputTime(value: string): string {
+  const trimmed = value.trim();
+  const match = /^(\d{2}):(\d{2})/.exec(trimmed);
+  return match ? `${match[1]}:${match[2]}` : trimmed;
+}
+
+export function historyToFormValues(history: ClinicalHistory): HistoryFormValues {
+  const { patient, consultation } = history;
+  const { vitals } = consultation;
+
+  return {
+    fullName: patient.fullName,
+    documentId: patient.documentId,
+    birthDate: inputDate(patient.birthDate),
+    email: patient.email,
+    phone: patient.phone,
+    address: patient.address,
+    city: patient.city,
+    gender: patient.gender,
+    visitDate: inputDate(consultation.visitDate),
+    visitTime: inputTime(consultation.visitTime),
+    reason: consultation.reason,
+    presentIllness: consultation.presentIllness,
+    medicalHistory: consultation.medicalHistory,
+    personalHistory: consultation.personalHistory,
+    familyHistory: consultation.familyHistory,
+    surgicalHistory: consultation.surgicalHistory,
+    pharmacologicalHistory: consultation.pharmacologicalHistory,
+    allergies: consultation.allergies,
+    allergicHistory: consultation.allergicHistory,
+    gynecologicalHistory: consultation.gynecologicalHistory,
+    bloodPressure: vitals.bloodPressure,
+    heartRate: vitals.heartRate,
+    respiratoryRate: vitals.respiratoryRate,
+    temperature: vitals.temperature,
+    oxygenSaturation: vitals.oxygenSaturation,
+    weight: vitals.weight,
+    height: vitals.height,
+    bmi: vitals.bmi,
+    physicalExam: consultation.physicalExam,
+    generalAppearance: consultation.generalAppearance,
+    headAndNeck: consultation.headAndNeck,
+    cardiovascularExam: consultation.cardiovascularExam,
+    respiratoryExam: consultation.respiratoryExam,
+    abdominalExam: consultation.abdominalExam,
+    neurologicalExam: consultation.neurologicalExam,
+    musculoskeletalExam: consultation.musculoskeletalExam,
+    otherPhysicalFindings: consultation.otherPhysicalFindings,
+    diagnosis: consultation.diagnosis,
+    secondaryDiagnoses: consultation.secondaryDiagnoses,
+    clinicalImpression: consultation.clinicalImpression,
+    currentMedications: consultation.currentMedications,
+    treatmentPlan: consultation.treatmentPlan,
+    recommendations: consultation.recommendations,
+    requestedExams: consultation.requestedExams,
+    referrals: consultation.referrals,
+    followUp: consultation.followUp,
+    notes: consultation.notes,
+  };
+}
+
+function historyFields(values: HistoryFormValues) {
+  return {
+    patient_full_name: values.fullName.trim(),
+    patient_document: values.documentId.trim(),
+    patient_birth_date: values.birthDate,
+    patient_email: values.email.trim(),
+    patient_phone: values.phone.trim(),
+    patient_address: values.address.trim(),
+    patient_city: values.city.trim(),
+    patient_gender: values.gender.trim(),
+    consultation_date: values.visitDate,
+    consultation_time: values.visitTime.trim(),
+    reason: values.reason.trim(),
+    current_illness: values.presentIllness.trim(),
+    medical_history: values.medicalHistory.trim(),
+    personal_history: values.personalHistory.trim(),
+    family_history: values.familyHistory.trim(),
+    surgical_history: values.surgicalHistory.trim(),
+    pharmacological_history: values.pharmacologicalHistory.trim(),
+    allergies: values.allergies.trim(),
+    allergic_history: values.allergicHistory.trim(),
+    gynecological_obstetric_history: values.gynecologicalHistory.trim(),
+    blood_pressure: values.bloodPressure.trim(),
+    heart_rate: values.heartRate.trim(),
+    respiratory_rate: values.respiratoryRate.trim(),
+    temperature: values.temperature.trim(),
+    oxygen_saturation: values.oxygenSaturation.trim(),
+    weight: values.weight.trim(),
+    height: values.height.trim(),
+    bmi: values.bmi.trim(),
+    physical_exam: values.physicalExam.trim(),
+    general_appearance: values.generalAppearance.trim(),
+    head_and_neck: values.headAndNeck.trim(),
+    cardiovascular_exam: values.cardiovascularExam.trim(),
+    respiratory_exam: values.respiratoryExam.trim(),
+    abdominal_exam: values.abdominalExam.trim(),
+    neurological_exam: values.neurologicalExam.trim(),
+    musculoskeletal_exam: values.musculoskeletalExam.trim(),
+    other_physical_findings: values.otherPhysicalFindings.trim(),
+    diagnosis: values.diagnosis.trim(),
+    secondary_diagnoses: values.secondaryDiagnoses.trim(),
+    clinical_impression: values.clinicalImpression.trim(),
+    medications: values.currentMedications.trim(),
+    treatment_plan: values.treatmentPlan.trim(),
+    medical_recommendations: values.recommendations.trim(),
+    requested_exams: values.requestedExams.trim(),
+    referrals: values.referrals.trim(),
+    follow_up: values.followUp.trim(),
+    observations: values.notes.trim(),
+  };
+}
+
+function savedHistory(data: unknown, fallback: string): ClinicalHistory {
+  if (typeof data !== "object" || data === null) {
+    throw new Error(fallback);
+  }
+
+  const history = toHistory(data as Record<string, unknown>);
+  if (!history) throw new Error(fallback);
+  return history;
+}
+
 export async function listHistories(): Promise<ClinicalHistory[]> {
   const supabase = getSupabaseBrowserClient();
   const doctorId = await currentUserId(supabase);
@@ -194,67 +323,49 @@ export async function saveHistory(values: HistoryFormValues): Promise<ClinicalHi
     .from("clinical_histories")
     .insert({
       doctor_id: doctorId,
-      patient_full_name: values.fullName.trim(),
-      patient_document: values.documentId.trim(),
-      patient_birth_date: values.birthDate,
-      patient_email: values.email.trim(),
-      patient_phone: values.phone.trim(),
-      patient_address: values.address.trim(),
-      patient_city: values.city.trim(),
-      patient_gender: values.gender.trim(),
-      consultation_date: values.visitDate,
-      consultation_time: values.visitTime.trim(),
-      reason: values.reason.trim(),
-      current_illness: values.presentIllness.trim(),
-      medical_history: values.medicalHistory.trim(),
-      personal_history: values.personalHistory.trim(),
-      family_history: values.familyHistory.trim(),
-      surgical_history: values.surgicalHistory.trim(),
-      pharmacological_history: values.pharmacologicalHistory.trim(),
-      allergies: values.allergies.trim(),
-      allergic_history: values.allergicHistory.trim(),
-      gynecological_obstetric_history: values.gynecologicalHistory.trim(),
-      blood_pressure: values.bloodPressure.trim(),
-      heart_rate: values.heartRate.trim(),
-      respiratory_rate: values.respiratoryRate.trim(),
-      temperature: values.temperature.trim(),
-      oxygen_saturation: values.oxygenSaturation.trim(),
-      weight: values.weight.trim(),
-      height: values.height.trim(),
-      bmi: values.bmi.trim(),
-      physical_exam: values.physicalExam.trim(),
-      general_appearance: values.generalAppearance.trim(),
-      head_and_neck: values.headAndNeck.trim(),
-      cardiovascular_exam: values.cardiovascularExam.trim(),
-      respiratory_exam: values.respiratoryExam.trim(),
-      abdominal_exam: values.abdominalExam.trim(),
-      neurological_exam: values.neurologicalExam.trim(),
-      musculoskeletal_exam: values.musculoskeletalExam.trim(),
-      other_physical_findings: values.otherPhysicalFindings.trim(),
-      diagnosis: values.diagnosis.trim(),
-      secondary_diagnoses: values.secondaryDiagnoses.trim(),
-      clinical_impression: values.clinicalImpression.trim(),
-      medications: values.currentMedications.trim(),
-      treatment_plan: values.treatmentPlan.trim(),
-      medical_recommendations: values.recommendations.trim(),
-      requested_exams: values.requestedExams.trim(),
-      referrals: values.referrals.trim(),
-      follow_up: values.followUp.trim(),
-      observations: values.notes.trim(),
+      ...historyFields(values),
     })
     .select(HISTORY_COLUMNS)
     .single();
 
   if (error) throw saveError(error);
 
-  if (typeof data !== "object" || data === null) {
-    throw new Error("No fue posible guardar la historia clínica.");
+  return savedHistory(data, "No fue posible guardar la historia clínica.");
+}
+
+export async function updateHistory(
+  id: string,
+  values: HistoryFormValues,
+): Promise<ClinicalHistory> {
+  const supabase = getSupabaseBrowserClient();
+  const doctorId = await currentUserId(supabase);
+  const { data, error } = await supabase
+    .from("clinical_histories")
+    .update(historyFields(values))
+    .eq("id", id)
+    .eq("doctor_id", doctorId)
+    .select(HISTORY_COLUMNS)
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "PGRST204" || /column/i.test(error.message ?? "")) throw saveError(error);
+    throw new Error("No fue posible actualizar la historia clínica.");
   }
 
-  const history = toHistory(data as Record<string, unknown>);
-  if (!history) {
-    throw new Error("No fue posible guardar la historia clínica.");
-  }
+  return savedHistory(data, "No fue posible actualizar la historia clínica.");
+}
 
-  return history;
+export async function deleteHistory(id: string): Promise<void> {
+  const supabase = getSupabaseBrowserClient();
+  const doctorId = await currentUserId(supabase);
+  const { data, error } = await supabase
+    .from("clinical_histories")
+    .delete()
+    .eq("id", id)
+    .eq("doctor_id", doctorId)
+    .select("id");
+
+  if (error || !Array.isArray(data) || data.length !== 1) {
+    throw new Error("No fue posible eliminar la historia clínica.");
+  }
 }

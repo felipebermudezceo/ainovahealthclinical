@@ -142,6 +142,20 @@ begin
       using (doctor_id = auth.uid())
       with check (doctor_id = auth.uid());
   end if;
+
+  if not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'public'
+      and tablename = 'clinical_histories'
+      and policyname = 'histories_delete_own'
+  ) then
+    create policy "histories_delete_own"
+      on public.clinical_histories
+      for delete
+      to authenticated
+      using (doctor_id = auth.uid());
+  end if;
 end $$;
 
 create or replace function public.handle_new_doctor()
@@ -200,7 +214,7 @@ end $$;
 
 grant select, update on table public.doctors to authenticated;
 
-grant select, insert, update on table public.clinical_histories to authenticated;
+grant select, insert, update, delete on table public.clinical_histories to authenticated;
 
 alter table public.clinical_histories
   add column if not exists patient_address text not null default '',

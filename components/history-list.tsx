@@ -6,7 +6,7 @@ import { ATTENDING_DOCTOR } from "@/lib/attending-doctor";
 import { BrandMark } from "@/components/brand-mark";
 import { primaryButtonClass, secondaryButtonClass } from "@/components/button-styles";
 import { formatDate, formatTime, isIsoDate, todayInputDate } from "@/lib/format";
-import { listHistories } from "@/lib/histories";
+import { deleteHistory, listHistories } from "@/lib/histories";
 import { requestSavedHistoryEmail } from "@/lib/request-history-email";
 import type { ClinicalHistory } from "@/lib/types";
 
@@ -30,12 +30,21 @@ function ageLabel(birthDate: string): string {
   return `${age} años`;
 }
 
-export function HistoryList() {
+export function HistoryList({ updated = false }: { updated?: boolean }) {
   const [histories, setHistories] = useState<ClinicalHistory[] | null>(null);
   const [loadError, setLoadError] = useState("");
   const [sendingId, setSendingId] = useState("");
+  const [deletingId, setDeletingId] = useState("");
   const [sendNotice, setSendNotice] = useState<{ id: string; ok: boolean; message: string } | null>(null);
+  const [actionNotice, setActionNotice] = useState<{ ok: boolean; message: string } | null>(
+    updated ? { ok: true, message: "La historia fue actualizada correctamente." } : null,
+  );
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    if (!updated) return;
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [updated]);
 
   useEffect(() => {
     let active = true;
@@ -55,8 +64,32 @@ export function HistoryList() {
     };
   }, []);
 
+  async function onDelete(historyId: string) {
+    if (sendingId || deletingId) return;
+    const confirmed = window.confirm(
+      "¿Estás seguro de que deseas eliminar esta historia? Esta acción no se puede deshacer.",
+    );
+    if (!confirmed) return;
+
+    setActionNotice(null);
+    setDeletingId(historyId);
+    try {
+      await deleteHistory(historyId);
+      setHistories((current) => (current ? current.filter((item) => item.id !== historyId) : current));
+      setSendNotice((current) => (current?.id === historyId ? null : current));
+      setActionNotice({ ok: true, message: "Historia clínica eliminada correctamente." });
+    } catch (error) {
+      setActionNotice({
+        ok: false,
+        message: error instanceof Error ? error.message : "No fue posible eliminar la historia clínica.",
+      });
+    } finally {
+      setDeletingId("");
+    }
+  }
+
   async function onSendPdf(historyId: string) {
-    if (sendingId) return;
+    if (sendingId || deletingId) return;
     setSendNotice(null);
     setSendingId(historyId);
     try {
@@ -96,6 +129,19 @@ export function HistoryList() {
           </p>
         </div>
       </header>
+
+      {actionNotice ? (
+        <p
+          role={actionNotice.ok ? "status" : "alert"}
+          className={`mb-4 rounded-lg border px-3 py-2 text-sm ${
+            actionNotice.ok
+              ? "border-mark/20 bg-success-bg text-success-ink"
+              : "border-danger/20 bg-danger-bg text-danger"
+          }`}
+        >
+          {actionNotice.message}
+        </p>
+      ) : null}
 
       {histories === null ? (
         <p className="rounded-2xl border border-line bg-surface px-5 py-8 text-sm text-muted shadow-[0_1px_2px_rgba(18,38,58,0.04)]">
@@ -167,6 +213,7 @@ export function HistoryList() {
                 const documentId = history.patient.documentId.trim();
                 const identity = [documentId, age, gender].filter(Boolean);
                 const sending = sendingId === history.id;
+                const deleting = deletingId === history.id;
                 const notice = sendNotice?.id === history.id ? sendNotice : null;
 
                 return (
@@ -210,10 +257,25 @@ export function HistoryList() {
                       <button
                         type="button"
                         onClick={() => onSendPdf(history.id)}
-                        disabled={sending}
+                        disabled={sending || deleting}
                         className={`${secondaryButtonClass} w-full`}
                       >
                         {sending ? "Enviando..." : "Enviar PDF"}
+                      </button>
+                      <Link
+                        href={`/historias/${history.id}/editar`}
+                        aria-disabled={deleting}
+                        className={`${secondaryButtonClass} w-full ${deleting ? "pointer-events-none opacity-60" : ""}`}
+                      >
+                        Editar
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(history.id)}
+                        disabled={sending || deleting}
+                        className={`${secondaryButtonClass} w-full text-danger`}
+                      >
+                        {deleting ? "Eliminando…" : "Eliminar"}
                       </button>
                     </div>
                     {notice ? (
