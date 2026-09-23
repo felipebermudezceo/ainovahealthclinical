@@ -15,8 +15,18 @@ export function RequireSession({ children }: RequireSessionProps) {
   useEffect(() => {
     let active = true;
 
-    getSupabaseBrowserClient()
-      .auth.getUser()
+    let client;
+    try {
+      client = getSupabaseBrowserClient();
+    } catch {
+      if (active) router.replace("/login");
+      return () => {
+        active = false;
+      };
+    }
+
+    client.auth
+      .getUser()
       .then(({ data }) => {
         if (!active) return;
         if (!data.user) {

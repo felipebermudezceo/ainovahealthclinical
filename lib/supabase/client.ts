@@ -4,11 +4,14 @@ let browserClient: SupabaseClient | undefined;
 
 function readPublicSupabaseEnv(): { url: string; publishableKey: string } {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ?? "";
-  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ?? "";
+  const publishableKey =
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
+    "";
 
   if (!url || !publishableKey) {
     throw new Error(
-      "Faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.",
+      "Faltan NEXT_PUBLIC_SUPABASE_URL y NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY (o NEXT_PUBLIC_SUPABASE_ANON_KEY).",
     );
   }
 

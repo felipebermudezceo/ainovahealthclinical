@@ -18,8 +18,21 @@ export function LoginScreen() {
   useEffect(() => {
     let active = true;
 
-    getSupabaseBrowserClient()
-      .auth.getUser()
+    let client;
+    try {
+      client = getSupabaseBrowserClient();
+    } catch (error) {
+      if (active) {
+        setError(error instanceof Error ? error.message : "No fue posible conectar con el servicio de acceso.");
+        setReady(true);
+      }
+      return () => {
+        active = false;
+      };
+    }
+
+    client.auth
+      .getUser()
       .then(({ data }) => {
         if (!active) return;
         if (data.user) {
@@ -47,10 +60,18 @@ export function LoginScreen() {
     }
 
     setSubmitting(true);
-    const { error: signInError } = await getSupabaseBrowserClient().auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
+    let signInError: { message?: string; code?: string } | null = null;
+    try {
+      const result = await getSupabaseBrowserClient().auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      signInError = result.error;
+    } catch (error) {
+      setSubmitting(false);
+      setError(error instanceof Error ? error.message : "No fue posible iniciar sesión.");
+      return;
+    }
 
     if (signInError) {
       setSubmitting(false);
